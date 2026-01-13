@@ -1,6 +1,4 @@
 
-/// <reference types="node" />
-
 import React, { useState, useRef } from 'react';
 import { OsintTool } from '../types';
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -45,15 +43,9 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool }) => {
 
     try {
         const ai = new GoogleGenerativeAI(process.env.API_KEY as string);
-        
         let prompt = '';
-        let imagePart = null;
 
         if (tool.inputType === 'file' && file) {
-            const base64 = await fileToBase64(file);
-            // Default to image/jpeg if type is missing, to ensure API accepts it (though browser usually supplies it)
-            const mimeType = file.type || 'image/jpeg';
-            imagePart = { inlineData: { mimeType, data: base64 } };
             prompt = `Analyze this file using ${tool.name}. Return realistic terminal output showing detailed metadata like Camera Model, ISO, Date/Time, Location, etc.`;
         } else {
             const cmd = tool.commandTemplate?.replace('{INPUT}', inputValue) || inputValue;
@@ -62,7 +54,14 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool }) => {
 
         // 1. Generate Text Output
         const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        const response = await model.generateContent(prompt);
+        let content: any = prompt;
+        if (tool.inputType === 'file' && file) {
+            const base64 = await fileToBase64(file);
+            const mimeType = file.type || 'image/jpeg';
+            const imagePart = { inlineData: { mimeType, data: base64 } };
+            content = [prompt, imagePart];
+        }
+        const response = await model.generateContent(content);
 
         setResult(response.response.text() || "Command executed.");
 
@@ -127,8 +126,8 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool }) => {
                         className="w-full bg-transparent border-b border-white/20 py-4 pl-10 text-2xl font-mono text-white placeholder-white/10 focus:outline-none focus:border-cyan-500 transition-all"
                         placeholder={tool.commandPlaceholder || "Enter target..."}
                         value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleRun()}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputValue(e.target.value)}
+                        onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleRun()}
                         autoFocus
                      />
                 </div>
